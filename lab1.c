@@ -347,9 +347,7 @@ void stdreq_get_status(void) {
 	switch (USB_buffer_data[bmRequestType]&0x1F) {	// extract request recipient bits
 	case RECIPIENT_DEVICE:
 		BD0I.address[0] = USB_device_status;
-		BD0I.address[1] = 0x00;
-		BD0I.bytecount = 0x02;
-		BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
+		goto set_bd0;
 		break;
 	case RECIPIENT_INTERFACE:
 		switch (USB_USWSTAT) {
@@ -359,9 +357,7 @@ void stdreq_get_status(void) {
 		case CONFIG_STATE:
 			if (USB_buffer_data[wIndex]<NUM_INTERFACES) {
 				BD0I.address[0] = 0x00;
-				BD0I.address[1] = 0x00;
-				BD0I.bytecount = 0x02;
-				BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
+				goto set_bd0;
 			} else {
 				goto error;
 			}
@@ -372,9 +368,7 @@ void stdreq_get_status(void) {
 		case ADDRESS_STATE:
 			if (!(USB_buffer_data[wIndex]&0x0F)) {	// get EP, strip off direction bit and see if it is EP0
 				BD0I.address[0] = (((USB_buffer_data[wIndex]&0x80) ? BD0I.status:BD0O.status)&0x04)>>2;	// return the BSTALL bit of EP0 IN or OUT, whichever was requested
-				BD0I.address[1] = 0x00;
-				BD0I.bytecount = 0x02;
-				BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
+				goto set_bd0;
 			} else {
 				goto error;
 			}
@@ -385,9 +379,7 @@ void stdreq_get_status(void) {
 			buf_desc_ptr = &BD0O+((n<<1)|((USB_buffer_data[wIndex]&0x80) ? 0x01:0x00));	// compute pointer to the buffer descriptor for the specified EP
 			if (UEP[n]&((USB_buffer_data[wIndex]&0x80) ? 0x02:0x04)) { // if the specified EP is enabled for transfers in the specified direction...
 				BD0I.address[0] = ((buf_desc_ptr->status)&0x04)>>2;	// ...return the BSTALL bit of the specified EP
-				BD0I.address[1] = 0x00;
-				BD0I.bytecount = 0x02;
-				BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
+				goto set_bd0;
 			} else {
 				goto error;
 			}
@@ -399,6 +391,11 @@ void stdreq_get_status(void) {
 	default:
 		goto error;
 	}
+	return;
+set_bd0:
+	BD0I.address[1] = 0x00;
+	BD0I.bytecount = 0x02;
+	BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
 	return;
 error:
 	USB_error_flags |= 0x01;	// set Request Error Flag
