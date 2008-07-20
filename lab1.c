@@ -339,7 +339,7 @@ void ProcessSetupToken(void) {
 	}
 }
 
-void stdreq_get_status(void) {
+static void stdreq_get_status(void) {
 	unsigned char *UEP;
 	unsigned char n;
 	BUFDESC *buf_desc_ptr;
@@ -396,72 +396,76 @@ set_bd0:
 	return;
 }
 
-void StandardRequests(void) {
+static void stdreq_feature(void) {
 	unsigned char *UEP;
 	unsigned char n;
 	BUFDESC *buf_desc_ptr;
 
+	switch (USB_buffer_data[bmRequestType]&0x1F) {	// extract request recipient bits
+	case RECIPIENT_DEVICE:
+		switch (USB_buffer_data[wValue]) {
+		case DEVICE_REMOTE_WAKEUP:
+			if (USB_buffer_data[bRequest]==CLEAR_FEATURE)
+				USB_device_status &= 0xFE;
+			else
+				USB_device_status |= 0x01;
+			BD0I.bytecount = 0x00;		// set EP0 IN byte count to 0
+			BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
+			break;
+		default:
+			USB_error_flags |= 0x01;	// set Request Error Flag
+		}
+		break;
+	case RECIPIENT_ENDPOINT:
+		switch (USB_USWSTAT) {
+		case ADDRESS_STATE:
+			if (!(USB_buffer_data[wIndex]&0x0F)) {	// get EP, strip off direction bit, and see if its EP0
+				BD0I.bytecount = 0x00;		// set EP0 IN byte count to 0
+				BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
+			} else {
+				USB_error_flags |= 0x01;	// set Request Error Flag
+			}
+			break;
+		case CONFIG_STATE:
+			UEP = (unsigned char *)&UEP0;
+			if (n = USB_buffer_data[wIndex]&0x0F) {	// get EP and strip off direction bit for offset from UEP0, if not EP0...
+				buf_desc_ptr = &BD0O+((n<<1)|((USB_buffer_data[wIndex]&0x80) ? 0x01:0x00));	// compute pointer to the buffer descriptor for the specified EP
+				if (USB_buffer_data[wIndex]&0x80) {	// if the specified EP direction is IN...
+					if (UEP[n]&0x02) {	// if EPn is enabled for IN transfers...
+						buf_desc_ptr->status = (USB_buffer_data[bRequest]==CLEAR_FEATURE) ? 0x00:0x84;
+					} else {
+						USB_error_flags |= 0x01;	// set Request Error Flag									
+					}
+				} else {	// ...otherwise the specified EP direction is OUT, so...
+					if (UEP[n]&0x04) {	// if EPn is enabled for OUT transfers...
+						buf_desc_ptr->status = (USB_buffer_data[bRequest]==CLEAR_FEATURE) ? 0x88:0x84;
+					} else {
+						USB_error_flags |= 0x01;	// set Request Error Flag									
+					}
+				}
+			}
+			if (!(USB_error_flags&0x01)) {	// if there was no Request Error...
+				BD0I.bytecount = 0x00;
+				BD0I.status = 0xC8;		// ...send packet as DATA1, set UOWN bit
+			}
+			break;
+		default:
+			USB_error_flags |= 0x01;	// set Request Error Flag
+		}
+		break;
+	default:
+		USB_error_flags |= 0x01;	// set Request Error Flag
+	}
+}
+
+void StandardRequests(void) {
 	switch (USB_buffer_data[bRequest]) {
 		case GET_STATUS:
 			stdreq_get_status();
 			break;
 		case CLEAR_FEATURE:
 		case SET_FEATURE:
-			switch (USB_buffer_data[bmRequestType]&0x1F) {	// extract request recipient bits
-				case RECIPIENT_DEVICE:
-					switch (USB_buffer_data[wValue]) {
-						case DEVICE_REMOTE_WAKEUP:
-							if (USB_buffer_data[bRequest]==CLEAR_FEATURE)
-								USB_device_status &= 0xFE;
-							else
-								USB_device_status |= 0x01;
-							BD0I.bytecount = 0x00;		// set EP0 IN byte count to 0
-							BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
-							break;
-						default:
-							USB_error_flags |= 0x01;	// set Request Error Flag
-					}
-					break;
-				case RECIPIENT_ENDPOINT:
-					switch (USB_USWSTAT) {
-						case ADDRESS_STATE:
-							if (!(USB_buffer_data[wIndex]&0x0F)) {	// get EP, strip off direction bit, and see if its EP0
-								BD0I.bytecount = 0x00;		// set EP0 IN byte count to 0
-								BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
-							} else {
-								USB_error_flags |= 0x01;	// set Request Error Flag
-							}
-							break;
-						case CONFIG_STATE:
-							UEP = (unsigned char *)&UEP0;
-							if (n = USB_buffer_data[wIndex]&0x0F) {	// get EP and strip off direction bit for offset from UEP0, if not EP0...
-								buf_desc_ptr = &BD0O+((n<<1)|((USB_buffer_data[wIndex]&0x80) ? 0x01:0x00));	// compute pointer to the buffer descriptor for the specified EP
-								if (USB_buffer_data[wIndex]&0x80) {	// if the specified EP direction is IN...
-									if (UEP[n]&0x02) {	// if EPn is enabled for IN transfers...
-										buf_desc_ptr->status = (USB_buffer_data[bRequest]==CLEAR_FEATURE) ? 0x00:0x84;
-									} else {
-										USB_error_flags |= 0x01;	// set Request Error Flag									
-									}
-								} else {	// ...otherwise the specified EP direction is OUT, so...
-									if (UEP[n]&0x04) {	// if EPn is enabled for OUT transfers...
-										buf_desc_ptr->status = (USB_buffer_data[bRequest]==CLEAR_FEATURE) ? 0x88:0x84;
-									} else {
-										USB_error_flags |= 0x01;	// set Request Error Flag									
-									}
-								}
-							}
-							if (!(USB_error_flags&0x01)) {	// if there was no Request Error...
-								BD0I.bytecount = 0x00;
-								BD0I.status = 0xC8;		// ...send packet as DATA1, set UOWN bit
-							}
-							break;
-						default:
-							USB_error_flags |= 0x01;	// set Request Error Flag
-					}
-					break;
-				default:
-					USB_error_flags |= 0x01;	// set Request Error Flag
-			}
+			stdreq_feature();
 			break;
 		case SET_ADDRESS:
 			if (USB_buffer_data[wValue]>0x7F) {	// if new device address is illegal, send Request Error
