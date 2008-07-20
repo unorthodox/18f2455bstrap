@@ -354,7 +354,7 @@ void stdreq_get_status(void) {
 	case RECIPIENT_INTERFACE:
 		switch (USB_USWSTAT) {
 		case ADDRESS_STATE:
-			USB_error_flags |= 0x01;	// set Request Error Flag
+			goto error;
 			break;
 		case CONFIG_STATE:
 			if (USB_buffer_data[wIndex]<NUM_INTERFACES) {
@@ -363,7 +363,7 @@ void stdreq_get_status(void) {
 				BD0I.bytecount = 0x02;
 				BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
 			} else {
-				USB_error_flags |= 0x01;	// set Request Error Flag
+				goto error;
 			}
 		}
 		break;
@@ -376,7 +376,7 @@ void stdreq_get_status(void) {
 				BD0I.bytecount = 0x02;
 				BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
 			} else {
-				USB_error_flags |= 0x01;	// set Request Error Flag
+				goto error;
 			}
 			break;
 		case CONFIG_STATE:
@@ -389,16 +389,19 @@ void stdreq_get_status(void) {
 				BD0I.bytecount = 0x02;
 				BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
 			} else {
-				USB_error_flags |= 0x01;	// set Request Error Flag
+				goto error;
 			}
 			break;
 		default:
-			USB_error_flags |= 0x01;	// set Request Error Flag
+			goto error;
 		}
 		break;
 	default:
-		USB_error_flags |= 0x01;	// set Request Error Flag
+		goto error;
 	}
+	return;
+error:
+	USB_error_flags |= 0x01;	// set Request Error Flag
 }
 
 void StandardRequests(void) {
