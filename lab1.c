@@ -458,6 +458,61 @@ static void stdreq_feature(void) {
 	}
 }
 
+static void stdreq_get_descriptor(void) {
+	USB_dev_req = GET_DESCRIPTOR;	// processing a GET_DESCRIPTOR request
+
+	switch (USB_buffer_data[wValueHigh]) {
+	case DEVICE:
+		USB_desc_ptr = Device;
+		USB_bytes_left = USB_desc_ptr[0];
+		if ((USB_buffer_data[wLengthHigh]==0x00) && (USB_buffer_data[wLength]<USB_bytes_left)) {
+			USB_bytes_left = USB_buffer_data[wLength];
+		}
+		SendDescriptorPacket();
+		break;
+	case CONFIGURATION:
+		switch (USB_buffer_data[wValue]) {
+		case 0:
+			USB_desc_ptr = Configuration1;
+			break;
+		default:
+			USB_error_flags |= 0x01;	// set Request Error Flag
+		}
+		if (!(USB_error_flags&0x01)) {
+			USB_bytes_left = USB_desc_ptr[2];	// wTotalLength at an offset of 2
+			if ((USB_buffer_data[wLengthHigh]==0x00) && (USB_buffer_data[wLength]<USB_bytes_left)) {
+				USB_bytes_left = USB_buffer_data[wLength];
+			}
+			SendDescriptorPacket();
+		}
+		break;
+	case STRING:
+		switch (USB_buffer_data[wValue]) {
+		case 0:
+			USB_desc_ptr = String0;
+			break;
+		case 1:
+			USB_desc_ptr = String1;
+			break;
+		case 2:
+			USB_desc_ptr = String2;
+			break;
+		default:
+			USB_error_flags |= 0x01;	// set Request Error Flag
+		}
+		if (!(USB_error_flags&0x01)) {
+			USB_bytes_left = USB_desc_ptr[0];
+			if ((USB_buffer_data[wLengthHigh]==0x00) && (USB_buffer_data[wLength]<USB_bytes_left)) {
+				USB_bytes_left = USB_buffer_data[wLength];
+			}
+			SendDescriptorPacket();
+		}
+		break;
+	default:
+		USB_error_flags |= 0x01;	// set Request Error Flag
+	}
+}
+
 void StandardRequests(void) {
 	switch (USB_buffer_data[bRequest]) {
 		case GET_STATUS:
@@ -478,57 +533,7 @@ void StandardRequests(void) {
 			}
 			break;
 		case GET_DESCRIPTOR:
-			USB_dev_req = GET_DESCRIPTOR;	// processing a GET_DESCRIPTOR request
-			switch (USB_buffer_data[wValueHigh]) {
-				case DEVICE:
-					USB_desc_ptr = Device;
-					USB_bytes_left = USB_desc_ptr[0];
-					if ((USB_buffer_data[wLengthHigh]==0x00) && (USB_buffer_data[wLength]<USB_bytes_left)) {
-						USB_bytes_left = USB_buffer_data[wLength];
-					}
-					SendDescriptorPacket();
-					break;
-				case CONFIGURATION:
-					switch (USB_buffer_data[wValue]) {
-						case 0:
-							USB_desc_ptr = Configuration1;
-							break;
-						default:
-							USB_error_flags |= 0x01;	// set Request Error Flag
-					}
-					if (!(USB_error_flags&0x01)) {
-						USB_bytes_left = USB_desc_ptr[2];	// wTotalLength at an offset of 2
-						if ((USB_buffer_data[wLengthHigh]==0x00) && (USB_buffer_data[wLength]<USB_bytes_left)) {
-							USB_bytes_left = USB_buffer_data[wLength];
-						}
-						SendDescriptorPacket();
-					}
-					break;
-				case STRING:
-					switch (USB_buffer_data[wValue]) {
-						case 0:
-							USB_desc_ptr = String0;
-							break;
-						case 1:
-							USB_desc_ptr = String1;
-							break;
-						case 2:
-							USB_desc_ptr = String2;
-							break;
-						default:
-							USB_error_flags |= 0x01;	// set Request Error Flag
-					}
-					if (!(USB_error_flags&0x01)) {
-						USB_bytes_left = USB_desc_ptr[0];
-						if ((USB_buffer_data[wLengthHigh]==0x00) && (USB_buffer_data[wLength]<USB_bytes_left)) {
-							USB_bytes_left = USB_buffer_data[wLength];
-						}
-						SendDescriptorPacket();
-					}
-					break;
-				default:
-					USB_error_flags |= 0x01;	// set Request Error Flag
-			}
+			stdreq_get_descriptor();
 			break;
 		case GET_CONFIGURATION:
 			BD0I.address[0] = USB_curr_config;	// copy current device configuration to EP0 IN buffer
