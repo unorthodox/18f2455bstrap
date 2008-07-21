@@ -513,110 +513,130 @@ static void stdreq_get_descriptor(void) {
 	}
 }
 
-void StandardRequests(void) {
-	switch (USB_buffer_data[bRequest]) {
-		case GET_STATUS:
-			stdreq_get_status();
+void stdreq_set_address(void) {
+	if (USB_buffer_data[wValue]>0x7F) {	// if new device address is illegal, send Request Error
+		USB_error_flags |= 0x01;	// set Request Error Flag
+	} else {
+		USB_dev_req = SET_ADDRESS;	// processing a SET_ADDRESS request
+		USB_address_pending = USB_buffer_data[wValue];	// save new address
+		BD0I.bytecount = 0x00;		// set EP0 IN byte count to 0
+		BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
+	}
+}
+
+void stdreq_get_configuration(void) {
+	BD0I.address[0] = USB_curr_config;	// copy current device configuration to EP0 IN buffer
+	BD0I.bytecount = 0x01;
+	BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
+}
+
+void stdreq_set_configuration(void) {
+	if (USB_buffer_data[wValue]<=NUM_CONFIGURATIONS) {
+		UEP1 = 0x00;	// clear all EP control registers except for EP0 to disable EP1-EP15 prior to setting configuration
+		UEP2 = 0x00;
+		UEP3 = 0x00;
+		UEP4 = 0x00;
+		UEP5 = 0x00;
+		UEP6 = 0x00;
+		UEP7 = 0x00;
+		UEP8 = 0x00;
+		UEP9 = 0x00;
+		UEP10 = 0x00;
+		UEP11 = 0x00;
+		UEP12 = 0x00;
+		UEP13 = 0x00;
+		UEP14 = 0x00;
+		UEP15 = 0x00;
+		switch (USB_curr_config = USB_buffer_data[wValue]) {
+		case 0:
+			USB_USWSTAT = ADDRESS_STATE;
+#ifdef SHOW_ENUM_STATUS
+			PORTB &= 0xE0;
+			PORTBbits.RB2 = 1;
+#endif
 			break;
-		case CLEAR_FEATURE:
-		case SET_FEATURE:
-			stdreq_feature();
-			break;
-		case SET_ADDRESS:
-			if (USB_buffer_data[wValue]>0x7F) {	// if new device address is illegal, send Request Error
-				USB_error_flags |= 0x01;	// set Request Error Flag
-			} else {
-				USB_dev_req = SET_ADDRESS;	// processing a SET_ADDRESS request
-				USB_address_pending = USB_buffer_data[wValue];	// save new address
-				BD0I.bytecount = 0x00;		// set EP0 IN byte count to 0
-				BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
-			}
-			break;
-		case GET_DESCRIPTOR:
-			stdreq_get_descriptor();
-			break;
-		case GET_CONFIGURATION:
-			BD0I.address[0] = USB_curr_config;	// copy current device configuration to EP0 IN buffer
+		default:
+			USB_USWSTAT = CONFIG_STATE;
+#ifdef SHOW_ENUM_STATUS
+			PORTB &= 0xE0;
+			PORTBbits.RB3 = 1;
+#endif
+		}
+		BD0I.bytecount = 0x00;		// set EP0 IN byte count to 0
+		BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
+	} else {
+		USB_error_flags |= 0x01;	// set Request Error Flag
+	}
+}
+
+void stdreq_get_interface(void) {
+	switch (USB_USWSTAT) {
+	case CONFIG_STATE:
+		if (USB_buffer_data[wIndex]<NUM_INTERFACES) {
+			BD0I.address[0] = 0x00;	// always send back 0 for bAlternateSetting
 			BD0I.bytecount = 0x01;
 			BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
-			break;
-		case SET_CONFIGURATION:
-			if (USB_buffer_data[wValue]<=NUM_CONFIGURATIONS) {
-				UEP1 = 0x00;	// clear all EP control registers except for EP0 to disable EP1-EP15 prior to setting configuration
-				UEP2 = 0x00;
-				UEP3 = 0x00;
-				UEP4 = 0x00;
-				UEP5 = 0x00;
-				UEP6 = 0x00;
-				UEP7 = 0x00;
-				UEP8 = 0x00;
-				UEP9 = 0x00;
-				UEP10 = 0x00;
-				UEP11 = 0x00;
-				UEP12 = 0x00;
-				UEP13 = 0x00;
-				UEP14 = 0x00;
-				UEP15 = 0x00;
-				switch (USB_curr_config = USB_buffer_data[wValue]) {
-					case 0:
-						USB_USWSTAT = ADDRESS_STATE;
-#ifdef SHOW_ENUM_STATUS
-						PORTB &= 0xE0;
-						PORTBbits.RB2 = 1;
-#endif
-						break;
-					default:
-						USB_USWSTAT = CONFIG_STATE;
-#ifdef SHOW_ENUM_STATUS
-						PORTB &= 0xE0;
-						PORTBbits.RB3 = 1;
-#endif
-				}
+		} else {
+			USB_error_flags |= 0x01;	// set Request Error Flag
+		}
+		break;
+	default:
+		USB_error_flags |= 0x01;	// set Request Error Flag
+	}
+}
+
+void stdreq_set_interface(void) {
+	switch (USB_USWSTAT) {
+	case CONFIG_STATE:
+		if (USB_buffer_data[wIndex]<NUM_INTERFACES) {
+			switch (USB_buffer_data[wValue]) {
+			case 0:		// currently support only bAlternateSetting of 0
 				BD0I.bytecount = 0x00;		// set EP0 IN byte count to 0
 				BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
-			} else {
+				break;
+			default:
 				USB_error_flags |= 0x01;	// set Request Error Flag
 			}
-			break;
-		case GET_INTERFACE:
-			switch (USB_USWSTAT) {
-				case CONFIG_STATE:
-					if (USB_buffer_data[wIndex]<NUM_INTERFACES) {
-						BD0I.address[0] = 0x00;	// always send back 0 for bAlternateSetting
-						BD0I.bytecount = 0x01;
-						BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
-					} else {
-						USB_error_flags |= 0x01;	// set Request Error Flag
-					}
-					break;
-				default:
-					USB_error_flags |= 0x01;	// set Request Error Flag
-			}
-			break;
-		case SET_INTERFACE:
-			switch (USB_USWSTAT) {
-				case CONFIG_STATE:
-					if (USB_buffer_data[wIndex]<NUM_INTERFACES) {
-						switch (USB_buffer_data[wValue]) {
-							case 0:		// currently support only bAlternateSetting of 0
-								BD0I.bytecount = 0x00;		// set EP0 IN byte count to 0
-								BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
-								break;
-							default:
-								USB_error_flags |= 0x01;	// set Request Error Flag
-						}
-					} else {
-						USB_error_flags |= 0x01;	// set Request Error Flag
-					}
-					break;
-				default:
-					USB_error_flags |= 0x01;	// set Request Error Flag
-			}
-			break;
-		case SET_DESCRIPTOR:
-		case SYNCH_FRAME:
-		default:
+		} else {
 			USB_error_flags |= 0x01;	// set Request Error Flag
+		}
+		break;
+	default:
+		USB_error_flags |= 0x01;	// set Request Error Flag
+	}
+}
+
+void StandardRequests(void) {
+	switch (USB_buffer_data[bRequest]) {
+	case GET_STATUS:
+		stdreq_get_status();
+		break;
+	case CLEAR_FEATURE:
+	case SET_FEATURE:
+		stdreq_feature();
+		break;
+	case SET_ADDRESS:
+		stdreq_set_address();
+		break;
+	case GET_DESCRIPTOR:
+		stdreq_get_descriptor();
+		break;
+	case GET_CONFIGURATION:
+		stdreq_get_configuration();
+		break;
+	case SET_CONFIGURATION:
+		stdreq_get_configuration();
+		break;
+	case GET_INTERFACE:
+		stdreq_get_interface();
+		break;
+	case SET_INTERFACE:
+		stdreq_set_interface();
+		break;
+	case SET_DESCRIPTOR:
+	case SYNCH_FRAME:
+	default:
+		USB_error_flags |= 0x01;	// set Request Error Flag
 	}
 }
 
