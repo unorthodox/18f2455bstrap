@@ -284,26 +284,26 @@ void ServiceUSB(void) {
 		UIRbits.TRNIF = 0;		// clear TRNIF interrupt flag
 #ifdef SHOW_ENUM_STATUS
 		switch (USB_USTAT&0x18) {	// toggle bit 5, 6, or 7 of PORTB to reflect EP0, EP1, or EP2 activity
-			case EP0:
-				PORTB ^= 0x20;
-				break;
-			case EP1:
-				PORTB ^= 0x40;
-				break;
-			case EP2:
-				PORTB ^= 0x80;
+		case EP0:
+			PORTB ^= 0x20;
+			break;
+		case EP1:
+			PORTB ^= 0x40;
+			break;
+		case EP2:
+			PORTB ^= 0x80;
 		}
 #endif
 		USB_error_flags = 0x00;	// clear USB error flags
 		switch (USB_buffer_desc.status&0x3C) {	// extract PID bits
-			case TOKEN_SETUP:
-				ProcessSetupToken();
-				break;
-			case TOKEN_IN:
-				ProcessInToken();
-				break;
-			case TOKEN_OUT:
-				ProcessOutToken();
+		case TOKEN_SETUP:
+			ProcessSetupToken();
+			break;
+		case TOKEN_IN:
+			ProcessInToken();
+			break;
+		case TOKEN_OUT:
+			ProcessOutToken();
 		}
 		if (USB_error_flags&0x01) {		// if there was a Request Error...
 			BD0O.bytecount = MAX_PACKET_SIZE;	// ...get ready to receive the next Setup token...
@@ -642,125 +642,125 @@ void StandardRequests(void) {
 
 void ClassRequests(void) {
 	switch (USB_buffer_data[bRequest]) {
-		default:
-			USB_error_flags |= 0x01;	// set Request Error Flag
+	default:
+		USB_error_flags |= 0x01;	// set Request Error Flag
 	}
 }
 
 void VendorRequests(void) {
 	switch (USB_buffer_data[bRequest]) {
-		case SET_RA0:
-			PORTAbits.RA0 = 1;		// set RA0 high
-			BD0I.bytecount = 0x00;		// set EP0 IN byte count to 0
-			BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
-			break;
-		case CLR_RA0:
-			PORTAbits.RA0 = 0;		// set RA0 low
-			BD0I.bytecount = 0x00;		// set EP0 IN byte count to 0
-			BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
-			break;
-		default:
-			USB_error_flags |= 0x01;	// set Request Error Flag
+	case SET_RA0:
+		PORTAbits.RA0 = 1;		// set RA0 high
+		BD0I.bytecount = 0x00;		// set EP0 IN byte count to 0
+		BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
+		break;
+	case CLR_RA0:
+		PORTAbits.RA0 = 0;		// set RA0 low
+		BD0I.bytecount = 0x00;		// set EP0 IN byte count to 0
+		BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
+		break;
+	default:
+		USB_error_flags |= 0x01;	// set Request Error Flag
 	}
 }
 
 void ProcessInToken(void) {
 	switch (USB_USTAT&0x78) {	// extract the EP bits
-		case EP0:
-			switch (USB_dev_req) {
-				case SET_ADDRESS:
-					switch (UADDR = USB_address_pending) {
-						case 0:
-							USB_USWSTAT = DEFAULT_STATE;
+	case EP0:
+		switch (USB_dev_req) {
+		case SET_ADDRESS:
+			switch (UADDR = USB_address_pending) {
+			case 0:
+				USB_USWSTAT = DEFAULT_STATE;
 #ifdef SHOW_ENUM_STATUS
-							PORTB &= 0xE0;
-							PORTBbits.RB1 = 1;
+				PORTB &= 0xE0;
+				PORTBbits.RB1 = 1;
 #endif
-							break;
-						default:
-							USB_USWSTAT = ADDRESS_STATE;
+				break;
+			default:
+				USB_USWSTAT = ADDRESS_STATE;
 #ifdef SHOW_ENUM_STATUS
-							PORTB &= 0xE0;
-							PORTBbits.RB2 = 1;
+				PORTB &= 0xE0;
+				PORTBbits.RB2 = 1;
 #endif
-					}
-					break;
-				case GET_DESCRIPTOR:
-					SendDescriptorPacket();
-					break;
 			}
 			break;
-		case EP1:
+		case GET_DESCRIPTOR:
+			SendDescriptorPacket();
 			break;
-		case EP2:
-			break;
-		case EP3:
-			break;
-		case EP4:
-			break;
-		case EP5:
-			break;
-		case EP6:
-			break;
-		case EP7:
-			break;
-		case EP8:
-			break;
-		case EP9:
-			break;
-		case EP10:
-			break;
-		case EP11:
-			break;
-		case EP12:
-			break;
-		case EP13:
-			break;
-		case EP14:
-			break;
-		case EP15:
-			break;
+		}
+		break;
+	case EP1:
+		break;
+	case EP2:
+		break;
+	case EP3:
+		break;
+	case EP4:
+		break;
+	case EP5:
+		break;
+	case EP6:
+		break;
+	case EP7:
+		break;
+	case EP8:
+		break;
+	case EP9:
+		break;
+	case EP10:
+		break;
+	case EP11:
+		break;
+	case EP12:
+		break;
+	case EP13:
+		break;
+	case EP14:
+		break;
+	case EP15:
+		break;
 	}
 }
 
 void ProcessOutToken(void) {
 	switch (USB_USTAT&0x78) {	// extract the EP bits
-		case EP0:
-			BD0O.bytecount = MAX_PACKET_SIZE;
-			BD0O.status = 0x88;
-			BD0I.bytecount = 0x00;		// set EP0 IN byte count to 0
-			BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
-			break;
-		case EP1:
-			break;
-		case EP2:
-			break;
-		case EP3:
-			break;
-		case EP4:
-			break;
-		case EP5:
-			break;
-		case EP6:
-			break;
-		case EP7:
-			break;
-		case EP8:
-			break;
-		case EP9:
-			break;
-		case EP10:
-			break;
-		case EP11:
-			break;
-		case EP12:
-			break;
-		case EP13:
-			break;
-		case EP14:
-			break;
-		case EP15:
-			break;
+	case EP0:
+		BD0O.bytecount = MAX_PACKET_SIZE;
+		BD0O.status = 0x88;
+		BD0I.bytecount = 0x00;		// set EP0 IN byte count to 0
+		BD0I.status = 0xC8;		// send packet as DATA1, set UOWN bit
+		break;
+	case EP1:
+		break;
+	case EP2:
+		break;
+	case EP3:
+		break;
+	case EP4:
+		break;
+	case EP5:
+		break;
+	case EP6:
+		break;
+	case EP7:
+		break;
+	case EP8:
+		break;
+	case EP9:
+		break;
+	case EP10:
+		break;
+	case EP11:
+		break;
+	case EP12:
+		break;
+	case EP13:
+		break;
+	case EP14:
+		break;
+	case EP15:
+		break;
 	}
 }
 
